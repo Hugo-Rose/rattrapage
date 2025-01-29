@@ -21,6 +21,8 @@ use Cake\Http\Exception\ForbiddenException;
 use Cake\Http\Exception\NotFoundException;
 use Cake\Http\Response;
 use Cake\View\Exception\MissingTemplateException;
+use Cake\Controller\Controller;
+use Cake\Event\EventInterface;
 
 /**
  * Static content controller
@@ -43,31 +45,22 @@ class PagesController extends AppController
      *   be found and not in debug mode.
      * @throws \Cake\View\Exception\MissingTemplateException In debug mode.
      */
-    public function display(string ...$path): ?Response
+    public function initialize(): void
     {
-        if (!$path) {
-            return $this->redirect('/');
-        }
-        if (in_array('..', $path, true) || in_array('.', $path, true)) {
-            throw new ForbiddenException();
-        }
-        $page = $subpage = null;
+        parent::initialize();
+        // Vérifier si l'utilisateur est authentifié
+        $this->loadComponent('Authentication.Authentication');
+    }
 
-        if (!empty($path[0])) {
-            $page = $path[0];
+    public function display(string ...$path)
+    {
+        // Si l'utilisateur n'est pas authentifié, rediriger vers la page de login
+        $identity = $this->Authentication->getIdentity();
+        if (!$identity) {
+            return $this->redirect(['controller' => 'Users', 'action' => 'login']);
         }
-        if (!empty($path[1])) {
-            $subpage = $path[1];
-        }
-        $this->set(compact('page', 'subpage'));
 
-        try {
-            return $this->render(implode('/', $path));
-        } catch (MissingTemplateException $exception) {
-            if (Configure::read('debug')) {
-                throw $exception;
-            }
-            throw new NotFoundException();
-        }
+        // Rendu normal de la page d'accueil si l'utilisateur est authentifié
+        $this->set(compact('path'));
     }
 }
