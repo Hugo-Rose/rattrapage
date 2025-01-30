@@ -5,6 +5,7 @@ namespace App\Controller;
 
 use Cake\Event\EventInterface;
 use Cake\Http\Response;
+use Cake\Auth\DefaultPasswordHasher;
 
 class UsersController extends AppController
 {
@@ -18,8 +19,8 @@ class UsersController extends AppController
         parent::initialize();
         $this->loadComponent('Authentication.Authentication');
 
-        // Autoriser les utilisateurs non authentifiés à accéder à login
-        $this->Authentication->allowUnauthenticated(['login']);
+        // Autoriser les utilisateurs non authentifiés à accéder à login, logout et register
+        $this->Authentication->allowUnauthenticated(['login', 'logout', 'register']);
     }
 
     /**
@@ -54,26 +55,25 @@ class UsersController extends AppController
      * @return \Cake\Http\Response|null|void Redirects on successful add, renders view otherwise.
      */
     public function add()
-{
-    $user = $this->Users->newEmptyEntity();
+    {
+        $user = $this->Users->newEmptyEntity();
 
-    // Exemple d'ajout d'un mot de passe haché
-    $hashedPassword = (new DefaultPasswordHasher)->hash('rattrapage1234');
-    // Assigner le mot de passe haché à l'entité user
-    $user->password = $hashedPassword;
+        if ($this->request->is('post')) {
+            // Hacher le mot de passe avant de l'enregistrer
+            $data = $this->request->getData();
+            $hasher = new DefaultPasswordHasher();
+            $data['password'] = $hasher->hash($data['password']);
 
-    if ($this->request->is('post')) {
-        // Sauvegarder l'utilisateur avec le mot de passe haché
-        $user = $this->Users->patchEntity($user, $this->request->getData());
+            $user = $this->Users->patchEntity($user, $data);
 
-        if ($this->Users->save($user)) {
-            $this->Flash->success(__('The user has been saved.'));
-            return $this->redirect(['action' => 'index']);
+            if ($this->Users->save($user)) {
+                $this->Flash->success(__('The user has been saved.'));
+                return $this->redirect(['action' => 'index']);
+            }
+            $this->Flash->error(__('The user could not be saved. Please, try again.'));
         }
-        $this->Flash->error(__('The user could not be saved. Please, try again.'));
+        $this->set(compact('user'));
     }
-    $this->set(compact('user'));
-}
 
     /**
      * Edit method
@@ -128,9 +128,15 @@ class UsersController extends AppController
         $result = $this->Authentication->getResult();
 
         if ($result->isValid()) {
+            $user = $this->Authentication->getIdentity();
             $this->Flash->success(__('Connexion réussie.'));
-            $redirect = $this->Authentication->getLoginRedirect() ?? '/';
-            return $this->redirect($redirect);
+
+            // Redirection personnalisée pour les administrateurs
+            if ($user->get('role') === 'admin') {
+                return $this->redirect(['controller' => 'Admin', 'action' => 'dashboard']);
+            }
+
+            return $this->redirect($this->Authentication->getLoginRedirect() ?? '/');
         }
 
         // Afficher un message d'erreur si l'authentification a échoué
@@ -148,6 +154,60 @@ class UsersController extends AppController
     {
         $this->Authentication->logout();
         $this->Flash->success(__('Vous avez été déconnecté.'));
-        return $this->redirect(['action' => 'login']);
+        return $this->redirect(['controller' => 'Pages', 'action' => 'home']);
+    }
+
+    /**
+     * Register method
+     *
+     * @return \Cake\Http\Response|null|void Redirects on successful registration, renders view otherwise.
+     */
+    public function register()
+    {
+        $user = $this->Users->newEmptyEntity();
+
+        if ($this->request->is('post')) {
+            // Récupérer les données du formulaire
+            $data = $this->request->getData();
+
+            // Hacher le mot de passe avant de l'enregistrer
+            $hasher = new DefaultPasswordHasher();
+            $data['password'] = $hasher->hash($data['password']);
+
+            // Assigner les données à l'entité User
+            $user = $this->Users->patchEntity($user, $data);
+
+            // Sauvegarder l'utilisateur
+            if ($this->Users->save($user)) {
+                $this->Flash->success(__('Votre inscription a été effectuée avec succès. Vous pouvez maintenant vous connecter.'));
+
+                // Rediriger vers la page de connexion
+                return $this->redirect(['action' => 'login']);
+            } else {
+                $this->Flash->error(__('Une erreur est survenue lors de votre inscription. Veuillez réessayer.'));
+            }
+        }
+
+        // Passer l'entité user à la vue
+        $this->set(compact('user'));
+    }
+
+    public function beforeFilter(EventInterface $event)
+    {
+        parent::beforeFilter($event);
+
+        // Autoriser l'accès à l'action 'login', 'logout' et 'register' pour tous les utilisateurs
+        $this->Authentication->allowUnauthenticated(['login', 'logout', 'register']);
+
+        // Vérifier les permissions pour les actions sensibles
+        if (in_array($this->request->getParam('action'), ['delete', 'edit', 'add'])) {
+            $user = $this->Authentication->getIdentity();
+
+            // Si l'utilisateur n'est pas administrateur, rediriger avec un message d'erreur
+            if (!$user || $user->get('role') !== 'admin') {
+                $this->Flash->error(__('Vous n\'avez pas les permissions nécessaires.'));
+                return $this->redirect(['action' => 'index']);
+            }
+        }
     }
 }

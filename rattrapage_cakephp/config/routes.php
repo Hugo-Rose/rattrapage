@@ -21,32 +21,32 @@
  * @license       https://opensource.org/licenses/mit-license.php MIT License
  */
 
- use Cake\Routing\Route\DashedRoute;
- use Cake\Routing\RouteBuilder;
- use Cake\Routing\Router;
- 
- return function (RouteBuilder $routes): void {
-     $routes->setRouteClass(DashedRoute::class);
- 
-     $routes->scope('/', function (RouteBuilder $builder): void {
-         // Page d'accueil
-         $builder->connect('/', ['controller' => 'Users', 'action' => 'login']);
- 
-         // Authentification
-         $builder->connect('/login', ['controller' => 'Users', 'action' => 'login']);
-         $builder->connect('/logout', ['controller' => 'Users', 'action' => 'logout']);
- 
-         // Gestion des utilisateurs (Admin uniquement)
-         $builder->connect('/users', ['controller' => 'Users', 'action' => 'index']);
-         $builder->connect('/users/add', ['controller' => 'Users', 'action' => 'add']);
-         $builder->connect('/users/edit/*', ['controller' => 'Users', 'action' => 'edit']);
-         $builder->connect('/users/delete/*', ['controller' => 'Users', 'action' => 'delete']);
- 
-         // Pages par défaut
-         $builder->connect('/pages/*', 'Pages::display');
- 
-         // Fallbacks pour les autres routes
-         $builder->fallbacks();
-     });
- };
- 
+use Cake\Routing\Route\DashedRoute;
+use Cake\Routing\RouteBuilder;
+use Cake\Routing\Router;
+
+return function (RouteBuilder $routes): void {
+    $routes->setRouteClass(DashedRoute::class);
+
+    $routes->scope('/', function (RouteBuilder $builder): void {
+        // Page d'accueil
+        $builder->connect('/', ['controller' => 'Users', 'action' => 'login']);
+
+        // Authentification
+        $builder->connect('/login', ['controller' => 'Users', 'action' => 'login']);
+        $builder->connect('/logout', ['controller' => 'Users', 'action' => 'logout']);
+        $builder->connect('/register', ['controller' => 'Users', 'action' => 'register']); // Nouvelle route pour l'inscription
+
+        // Gestion des utilisateurs (Admin uniquement)
+        $builder->connect('/users', ['controller' => 'Users', 'action' => 'index']);
+        $builder->connect('/users/add', ['controller' => 'Users', 'action' => 'add']);
+        $builder->connect('/users/edit/*', ['controller' => 'Users', 'action' => 'edit']);
+        $builder->connect('/users/delete/*', ['controller' => 'Users', 'action' => 'delete']);
+
+        // Pages par défaut
+        $builder->connect('/pages/*', 'Pages::display');
+
+        // Fallbacks pour les autres routes
+        $builder->fallbacks();
+    });
+};
