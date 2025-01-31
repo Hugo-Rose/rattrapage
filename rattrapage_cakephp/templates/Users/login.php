@@ -36,14 +36,17 @@
 </style>
 
 <div class="users form">
-    <h2>Connexion</h2>
+<?= $this->Flash->render() ?>
+    <h3>Connexion</h3>
     <?= $this->Form->create() ?>
     <fieldset>
-        <?= $this->Form->control('email', ['label' => 'Adresse e-mail', 'required' => true]) ?>
-        <?= $this->Form->control('password', ['label' => 'Mot de passe', 'type' => 'password', 'required' => true]) ?>
+        <legend><?= __('Veuillez entrer votre nom d\'utilisateur et votre mot de passe') ?></legend>
+        <?= $this->Form->control('email', ['required' => true]) ?>
+        <?= $this->Form->control('password', ['required' => true]) ?>
     </fieldset>
-    <?= $this->Form->button('Se connecter', ['class' => 'btn btn-primary']) ?>
+    <?= $this->Form->submit(__('Login')); ?>
     <?= $this->Form->end() ?>
+    
 
     <!-- Lien vers la page d'inscription -->
     <div class="register-link">

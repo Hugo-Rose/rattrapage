@@ -1,6 +1,19 @@
 <?php
 declare(strict_types=1);
 
+/**
+ * CakePHP(tm) : Rapid Development Framework (https://cakephp.org)
+ * Copyright (c) Cake Software Foundation, Inc. (https://cakefoundation.org)
+ *
+ * Licensed under The MIT License
+ * For full copyright and license information, please see the LICENSE.txt
+ * Redistributions of files must retain the above copyright notice.
+ *
+ * @copyright Copyright (c) Cake Software Foundation, Inc. (https://cakefoundation.org)
+ * @link      https://cakephp.org CakePHP(tm) Project
+ * @since     3.3.0
+ * @license   https://opensource.org/licenses/mit-license.php MIT License
+ */
 namespace App;
 
 use Cake\Core\Configure;
@@ -14,15 +27,23 @@ use Cake\Http\MiddlewareQueue;
 use Cake\ORM\Locator\TableLocator;
 use Cake\Routing\Middleware\AssetMiddleware;
 use Cake\Routing\Middleware\RoutingMiddleware;
-use Authentication\Middleware\AuthenticationMiddleware;
-use Authentication\AuthenticationService;
-use Authentication\Authenticator\SessionAuthenticator;
-use Authentication\Authenticator\FormAuthenticator;
 
+use Authentication\AuthenticationService;
+use Authentication\AuthenticationServiceInterface;
+use Authentication\AuthenticationServiceProviderInterface;
+use Authentication\Middleware\AuthenticationMiddleware;
+use Cake\Routing\Router;
+use Psr\Http\Message\ServerRequestInterface;
 /**
  * Application setup class.
+ *
+ * This defines the bootstrapping logic and middleware layers you
+ * want to use in your application.
+ *
+ * @extends \Cake\Http\BaseApplication<\App\Application>
  */
-class Application extends BaseApplication
+
+class Application extends BaseApplication implements AuthenticationServiceProviderInterface
 {
     /**
      * Load all the application configuration and bootstrap logic.
@@ -31,19 +52,15 @@ class Application extends BaseApplication
      */
     public function bootstrap(): void
     {
-        // Appel du parent pour charger les fichiers bootstrap
+        // Call parent to load bootstrap from files.
         parent::bootstrap();
 
-        // Vérification de l'environnement CLI
         if (PHP_SAPI !== 'cli') {
             FactoryLocator::add(
                 'Table',
                 (new TableLocator())->allowFallbackClass(false)
             );
         }
-
-        // Chargement du plugin Authentication
-        $this->addPlugin('Authentication');
     }
 
     /**
@@ -54,58 +71,65 @@ class Application extends BaseApplication
      */
     public function middleware(MiddlewareQueue $middlewareQueue): MiddlewareQueue
     {
-        
-    // Ajoute l'authentification après
-    $middlewareQueue->add(new AuthenticationMiddleware($this->getAuthenticationService()));
+        $middlewareQueue
+            // Catch any exceptions in the lower layers,
+            // and make an error page/response
+            ->add(new ErrorHandlerMiddleware(Configure::read('Error'), $this))
 
-        // Middleware de gestion des erreurs
-        $middlewareQueue->add(new ErrorHandlerMiddleware(Configure::read('Error')));
+            // Handle plugin/theme assets like CakePHP normally does.
+            ->add(new AssetMiddleware([
+                'cacheTime' => Configure::read('Asset.cacheTime'),
+            ]))
 
-        // Middleware d'assets (CSS, JS, etc.)
-        $middlewareQueue->add(new AssetMiddleware());
+            // Add routing middleware.
+            // If you have a large number of routes connected, turning on routes
+            // caching in production could improve performance.
+            // See https://github.com/CakeDC/cakephp-cached-routing
+            ->add(new RoutingMiddleware($this))
 
-        // Middleware de routage
-        $middlewareQueue->add(new RoutingMiddleware($this));
+            // Parse various types of encoded request bodies so that they are
+            // available as array through $request->getData()
+            // https://book.cakephp.org/5/en/controllers/middleware.html#body-parser-middleware
+            ->add(new BodyParserMiddleware())
 
-        // Middleware d'authentification
-        $authentication = new AuthenticationMiddleware($this->getAuthenticationService());
-        $middlewareQueue->add($authentication);
-
-        // Middleware de parsing du corps de la requête
-        $middlewareQueue->add(new BodyParserMiddleware());
-
-        // Middleware de protection CSRF
-        $middlewareQueue->add(new CsrfProtectionMiddleware());
+            // Cross Site Request Forgery (CSRF) Protection Middleware
+            // https://book.cakephp.org/5/en/security/csrf.html#cross-site-request-forgery-csrf-middleware
+            ->add(new CsrfProtectionMiddleware([
+                'httponly' => true,
+          
+            ]))
+            ->add(new RoutingMiddleware($this))
+            ->add(new AuthenticationMiddleware($this));
 
         return $middlewareQueue;
     }
 
-    /**
-     * Get the authentication service.
-     *
-     * @return \Authentication\AuthenticationService The authentication service.
-     */
-    public function getAuthenticationService(): AuthenticationService
+    public function services(ContainerInterface $container): void
     {
-        $service = new AuthenticationService();
-
-        $service->setConfig([
-            'unauthenticatedRedirect' => '/users/login',
+    }
+    public function getAuthenticationService(ServerRequestInterface $request): AuthenticationServiceInterface
+    {
+        $authenticationService = new AuthenticationService([
+            'unauthenticatedRedirect' => Router::url('/users/login'),
             'queryParam' => 'redirect',
         ]);
-
-        // Authentificateurs
-        $service->loadAuthenticator(SessionAuthenticator::class);
-        $service->loadAuthenticator(FormAuthenticator::class, [
-            'fields' => ['username' => 'email', 'password' => 'password'],
-            'loginUrl' => '/users/login',
+        // Charge les identifiants et s'assure que nous vérifions les champs e-mail et mot de passe
+        $authenticationService->loadIdentifier('Authentication.Password', [
+            'fields' => [
+                'username' => 'email',
+                'password' => 'password',
+            ]
         ]);
-
-        // Identifiants (User Table)
-        $service->loadIdentifier('Authentication.Password', [
-            'fields' => ['username' => 'email', 'password' => 'password'],
+        // Charge les authenticators, nous voulons celui de session en premier
+        $authenticationService->loadAuthenticator('Authentication.Session');
+        // Configure la vérification des données du formulaire pour choisir l'email et le mot de passe
+        $authenticationService->loadAuthenticator('Authentication.Form', [
+            'fields' => [
+                'username' => 'email',
+                'password' => 'password',
+            ],
+            'loginUrl' => Router::url('/users/login'),
         ]);
-
-        return $service;
+        return $authenticationService;
     }
 }

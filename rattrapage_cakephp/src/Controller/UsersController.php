@@ -29,12 +29,16 @@ class UsersController extends AppController
      * @return \Cake\Http\Response|null|void Renders view
      */
     public function index()
-    {
-        $query = $this->Users->find();
-        $users = $this->paginate($query);
+{
+    // Récupérer tous les utilisateurs
+    $users = $this->Users->find('all');
 
-        $this->set(compact('users'));
-    }
+    // Récupérer les utilisateurs paginés
+    $users = $this->paginate($this->Users);
+
+    // Passer les utilisateurs à la vue
+    $this->set(compact('users'));
+}
 
     /**
      * View method
@@ -122,28 +126,26 @@ class UsersController extends AppController
      *
      * @return \Cake\Http\Response|null|void Redirects on successful login, renders view otherwise.
      */
-    public function login()
-    {
-        $this->request->allowMethod(['get', 'post']);
-        $result = $this->Authentication->getResult();
-
-        if ($result->isValid()) {
-            $user = $this->Authentication->getIdentity();
-            $this->Flash->success(__('Connexion réussie.'));
-
-            // Redirection personnalisée pour les administrateurs
-            if ($user->get('role') === 'admin') {
-                return $this->redirect(['controller' => 'Admin', 'action' => 'dashboard']);
-            }
-
-            return $this->redirect($this->Authentication->getLoginRedirect() ?? '/');
+    
+     public function login()
+     {
+         $this->request->allowMethod(['get', 'post']);
+         $result = $this->Authentication->getResult();
+         // indépendamment de POST ou GET, rediriger si l'utilisateur est connecté
+         if ($result && $result->isValid()) {
+             // rediriger vers /users après la connexion réussie
+             $redirect = $this->request->getQuery('redirect', [
+                 'controller' => 'Users',
+                 'action' => 'index',
+             ]);
+             return $this->redirect($redirect);
+         }
+         // afficher une erreur si l'utilisateur a soumis un formulaire
+         // et que l'authentification a échoué
+         if ($this->request->is('post') && !$result->isValid()) {
+             $this->Flash->error(__('Votre identifiant ou votre mot de passe est incorrect.'));
+         }
         }
-
-        // Afficher un message d'erreur si l'authentification a échoué
-        if ($this->request->is('post')) {
-            $this->Flash->error(__('Identifiants incorrects, veuillez réessayer.'));
-        }
-    }
 
     /**
      * Logout method
@@ -171,8 +173,8 @@ class UsersController extends AppController
             $data = $this->request->getData();
 
             // Hacher le mot de passe avant de l'enregistrer
-            $hasher = new DefaultPasswordHasher();
-            $data['password'] = $hasher->hash($data['password']);
+            //$hasher = new DefaultPasswordHasher();
+            //$data['password'] = $hasher->hash($data['password']);
 
             // Assigner les données à l'entité User
             $user = $this->Users->patchEntity($user, $data);
@@ -192,22 +194,11 @@ class UsersController extends AppController
         $this->set(compact('user'));
     }
 
-    public function beforeFilter(EventInterface $event)
+    public function beforeFilter(\Cake\Event\EventInterface $event)
     {
         parent::beforeFilter($event);
-
-        // Autoriser l'accès à l'action 'login', 'logout' et 'register' pour tous les utilisateurs
-        $this->Authentication->allowUnauthenticated(['login', 'logout', 'register']);
-
-        // Vérifier les permissions pour les actions sensibles
-        if (in_array($this->request->getParam('action'), ['delete', 'edit', 'add'])) {
-            $user = $this->Authentication->getIdentity();
-
-            // Si l'utilisateur n'est pas administrateur, rediriger avec un message d'erreur
-            if (!$user || $user->get('role') !== 'admin') {
-                $this->Flash->error(__('Vous n\'avez pas les permissions nécessaires.'));
-                return $this->redirect(['action' => 'index']);
-            }
-        }
+        // Configurez l'action de connexion pour ne pas exiger d'authentification,
+        // évitant ainsi le problème de la boucle de redirection infinie
+        $this->Authentication->addUnauthenticatedActions(['login']);
     }
 }

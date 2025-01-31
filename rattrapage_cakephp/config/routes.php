@@ -38,7 +38,7 @@ return function (RouteBuilder $routes): void {
         $builder->connect('/register', ['controller' => 'Users', 'action' => 'register']); // Nouvelle route pour l'inscription
 
         // Gestion des utilisateurs (Admin uniquement)
-        $builder->connect('/users', ['controller' => 'Users', 'action' => 'index']);
+        $builder->connect('/users', ['controller' => 'Users', 'action' => 'login']);
         $builder->connect('/users/add', ['controller' => 'Users', 'action' => 'add']);
         $builder->connect('/users/edit/*', ['controller' => 'Users', 'action' => 'edit']);
         $builder->connect('/users/delete/*', ['controller' => 'Users', 'action' => 'delete']);
