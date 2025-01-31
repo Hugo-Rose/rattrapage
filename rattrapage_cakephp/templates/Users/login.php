@@ -53,3 +53,8 @@
         <p>Pas encore de compte ? <?= $this->Html->link('S\'inscrire', ['action' => 'register'], ['class' => 'btn btn-secondary']) ?></p>
     </div>
 </div>
+<div class="footer-content">
+            <p>&copy; <?= date('Y') ?> <a href="https://github.com/Hugo-Rose" target="_blank">ROSE Hugo</a>. Tous droits réservés.
+            </p>
+            <p>Propulsé avec <a href="https://cakephp.org" target="_blank">CakePHP</a>.</p>
+        </div>

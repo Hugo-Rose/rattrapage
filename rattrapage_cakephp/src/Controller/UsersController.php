@@ -134,11 +134,12 @@ class UsersController extends AppController
          // indépendamment de POST ou GET, rediriger si l'utilisateur est connecté
          if ($result && $result->isValid()) {
              // rediriger vers /users après la connexion réussie
-             $redirect = $this->request->getQuery('redirect', [
-                 'controller' => 'Users',
+             $redirect = $this->request->getQuery('index', [
+                 'controller' => 'index',
                  'action' => 'index',
              ]);
-             return $this->redirect($redirect);
+             return $this->redirect(['controller' => 'Users', 'action' => 'index']);
+
          }
          // afficher une erreur si l'utilisateur a soumis un formulaire
          // et que l'authentification a échoué
