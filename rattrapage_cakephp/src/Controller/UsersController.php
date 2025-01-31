@@ -87,19 +87,19 @@ class UsersController extends AppController
      * @throws \Cake\Datasource\Exception\RecordNotFoundException When record not found.
      */
     public function edit($id = null)
-    {
-        $user = $this->Users->get($id);
-        if ($this->request->is(['patch', 'post', 'put'])) {
-            $user = $this->Users->patchEntity($user, $this->request->getData());
-            if ($this->Users->save($user)) {
-                $this->Flash->success(__('L\'utilisateur a été mis à jour avec succès.'));
-
-                return $this->redirect(['action' => 'index']);
-            }
-            $this->Flash->error(__('Impossible de mettre à jour l\'utilisateur. Veuillez réessayer.'));
+{
+    $user = $this->Users->get($id); // Récupère l'utilisateur par son ID
+    if ($this->request->is(['post', 'put'])) { // Vérifie si c'est une requête POST ou PUT
+        $this->Users->patchEntity($user, $this->request->getData()); // Mise à jour des données
+        if ($this->Users->save($user)) { // Sauvegarde des modifications
+            $this->Flash->success(__('L\'utilisateur a été mis à jour.'));
+        } else {
+            $this->Flash->error(__('Erreur lors de la mise à jour.'));
         }
-        $this->set(compact('user'));
     }
+    return $this->redirect(['action' => 'index']); // Retourne sur la liste après modification
+}
+
 
     /**
      * Delete method
